@@ -2,25 +2,29 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import { authMiddleware } from './src/server/auth';
-import { apiRouter } from './src/server/routes';
+import { createExpressApp } from './src/server/app';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
-  const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const app = createExpressApp();
+
+  // Resolve port
+  let port = 3000;
+  const portArgIndex = process.argv.indexOf('--port');
+  if (portArgIndex !== -1 && process.argv[portArgIndex + 1]) {
+    port = parseInt(process.argv[portArgIndex + 1], 10);
+  } else {
+    const inlinePortArg = process.argv.find(a => a.startsWith('--port='));
+    if (inlinePortArg) {
+      port = parseInt(inlinePortArg.split('=')[1], 10);
+    } else if (process.env.PORT && process.env.PORT !== '8080') {
+      port = parseInt(process.env.PORT, 10);
+    }
+  }
+
   const isProd = process.env.NODE_ENV === 'production';
-
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-  // Attach auth middleware to populate req.user if token is present
-  app.use(authMiddleware);
-
-  // Mount API router
-  app.use('/api', apiRouter);
 
   // Vite middleware in dev or static serving in production
   if (!isProd) {
@@ -37,8 +41,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`INKWAVE server running on http://0.0.0.0:${PORT} [mode: ${isProd ? 'production' : 'development'}]`);
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`INKWAVE server running on http://0.0.0.0:${port} [mode: ${isProd ? 'production' : 'development'}]`);
   });
 }
 

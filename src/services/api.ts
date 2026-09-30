@@ -18,6 +18,16 @@ export const authStorage = {
   clearToken: () => localStorage.removeItem(TOKEN_KEY)
 };
 
+const getApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    const envUrl = (import.meta as any).env?.VITE_API_URL || (import.meta as any).env?.VITE_API_BASE_URL;
+    if (envUrl && typeof envUrl === 'string' && envUrl.trim()) {
+      return envUrl.trim().replace(/\/$/, '');
+    }
+  }
+  return '';
+};
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = authStorage.getToken();
   const headers: Record<string, string> = {
@@ -29,14 +39,45 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(endpoint, {
-    ...options,
-    headers
-  });
+  const baseUrl = getApiBaseUrl();
+  const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
 
-  const data = await response.json().catch(() => ({}));
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers
+    });
+  } catch {
+    throw new Error('Unable to connect to the server. Please check your internet connection.');
+  }
+
+  let data: any = {};
+  try {
+    data = await response.json();
+  } catch {
+    // Non-JSON response (e.g. 404 HTML fallback from a static server)
+    if (response.status === 404) {
+      throw new Error('Unable to connect to the server (Endpoint not found).');
+    }
+  }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(data.error || 'Invalid email or password.');
+    }
+    if (response.status === 404) {
+      throw new Error(data.error || 'Unable to connect to the server (Endpoint not found).');
+    }
+    if (response.status === 400) {
+      throw new Error(data.error || 'Invalid request. Please check your inputs.');
+    }
+    if (response.status === 403) {
+      throw new Error(data.error || 'Account suspended or access forbidden.');
+    }
+    if (response.status >= 500) {
+      throw new Error(data.error || 'Server error. Please try again shortly.');
+    }
     throw new Error(data.error || `Request failed with status ${response.status}`);
   }
 
@@ -51,11 +92,17 @@ export const api = {
       body: JSON.stringify(payload)
     }),
 
-  login: (payload: { identifier: string; password: string }) =>
-    request<{ user: UserPublic; token: string; message: string }>('/api/auth/login', {
+  login: (payload: { emailOrUsername?: string; identifier?: string; password: string }) => {
+    const loginIdentifier = (payload.emailOrUsername || payload.identifier || '').trim();
+    return request<{ user: UserPublic; token: string; message: string }>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify(payload)
-    }),
+      body: JSON.stringify({
+        emailOrUsername: loginIdentifier,
+        identifier: loginIdentifier,
+        password: payload.password
+      })
+    });
+  },
 
   logout: () =>
     request<{ message: string }>('/api/auth/logout', { method: 'POST' }),

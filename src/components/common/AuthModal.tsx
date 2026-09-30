@@ -26,15 +26,16 @@ export const AuthModal: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-    if (!emailOrUsername || !password) {
-      setErrorMsg('Please enter both your identifier and password');
+    const cleanId = emailOrUsername.trim();
+    if (!cleanId || !password) {
+      setErrorMsg('Please enter both your email or username and password');
       return;
     }
     setLoading(true);
     try {
-      await login(emailOrUsername, password);
+      await login(cleanId, password);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Login failed');
+      setErrorMsg(err.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }

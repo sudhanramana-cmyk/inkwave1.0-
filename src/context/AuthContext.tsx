@@ -52,9 +52,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchCurrentUser();
   }, [fetchCurrentUser]);
 
-  const login = async (identifier: string, password: string) => {
+  const login = async (emailOrUsername: string, password: string) => {
     try {
-      const res = await api.login({ identifier, password });
+      const res = await api.login({ emailOrUsername, password });
       authStorage.setToken(res.token);
       setUser(res.user);
       setAuthModalState(prev => ({ ...prev, isOpen: false }));
@@ -89,10 +89,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updatedUser);
   };
 
-  const quickSwitch = async (identifier: string, password = 'password123') => {
+  const quickSwitch = async (emailOrUsername: string, password = 'password123') => {
     try {
-      const pass = identifier === 'admin' ? 'admin123' : password;
-      const res = await api.login({ identifier, password: pass });
+      const pass = emailOrUsername === 'admin' ? 'admin123' : password;
+      const res = await api.login({ emailOrUsername, password: pass });
       authStorage.setToken(res.token);
       setUser(res.user);
       success(`Switched account to ${res.user.name} (${res.user.role})`);

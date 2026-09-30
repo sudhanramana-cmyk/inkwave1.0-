@@ -10,8 +10,8 @@ export const apiRouter = Router();
 // 1. AUTHENTICATION ROUTES
 // ==========================================
 
-apiRouter.post('/auth/register', (req: Request, res: Response) => {
-  const { name, username, email, password, avatar_url } = req.body;
+const handleRegister = (req: Request, res: Response) => {
+  const { name, username, email, password, avatar_url } = req.body || {};
 
   if (!name || !username || !email || !password) {
     return res.status(400).json({ error: 'Name, username, email, and password are required' });
@@ -59,18 +59,19 @@ apiRouter.post('/auth/register', (req: Request, res: Response) => {
     token,
     user: publicUser
   });
-});
+};
 
-apiRouter.post('/auth/login', (req: Request, res: Response) => {
-  const { identifier, password } = req.body; // identifier can be email or username
+const handleLogin = (req: Request, res: Response) => {
+  const { emailOrUsername, identifier, username, email, password } = req.body || {};
+  const loginIdentifier = (emailOrUsername || identifier || username || email || '').trim();
 
-  if (!identifier || !password) {
+  if (!loginIdentifier || !password) {
     return res.status(400).json({ error: 'Email/username and password are required' });
   }
 
-  const user = db.findUserByEmailOrUsername(identifier);
+  const user = db.findUserByEmailOrUsername(loginIdentifier);
   if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials. User not found.' });
+    return res.status(401).json({ error: 'Invalid email or password.' });
   }
 
   if (user.is_suspended) {
@@ -79,29 +80,41 @@ apiRouter.post('/auth/login', (req: Request, res: Response) => {
 
   const isValidPassword = bcrypt.compareSync(password, user.password_hash);
   if (!isValidPassword) {
-    return res.status(401).json({ error: 'Invalid credentials. Password incorrect.' });
+    return res.status(401).json({ error: 'Invalid email or password.' });
   }
 
   const publicUser = db.toPublicUser(user);
   const token = generateToken(publicUser);
 
-  return res.json({
+  return res.status(200).json({
     message: 'Login successful',
     token,
     user: publicUser
   });
-});
+};
 
-apiRouter.post('/auth/logout', (_req: Request, res: Response) => {
-  return res.json({ message: 'Logged out successfully' });
-});
+const handleLogout = (_req: Request, res: Response) => {
+  return res.status(200).json({ message: 'Logged out successfully' });
+};
 
-apiRouter.get('/auth/me', (req: AuthenticatedRequest, res: Response) => {
+const handleMe = (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  return res.json({ user: req.user });
-});
+  return res.status(200).json({ user: req.user });
+};
+
+apiRouter.post('/auth/register', handleRegister);
+apiRouter.post('/register', handleRegister);
+
+apiRouter.post('/auth/login', handleLogin);
+apiRouter.post('/login', handleLogin);
+
+apiRouter.post('/auth/logout', handleLogout);
+apiRouter.post('/logout', handleLogout);
+
+apiRouter.get('/auth/me', handleMe);
+apiRouter.get('/me', handleMe);
 
 apiRouter.post('/auth/forgot-password', (req: Request, res: Response) => {
   const { email } = req.body;
